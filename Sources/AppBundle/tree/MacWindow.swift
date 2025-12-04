@@ -4,6 +4,7 @@ import Common
 final class MacWindow: Window {
     let macApp: MacApp
     private var prevUnhiddenProportionalPositionInsideWorkspaceRect: CGPoint?
+    private var lastHiddenCornerTopLeft: CGPoint?
 
     @MainActor
     private init(_ id: UInt32, _ actor: MacApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
@@ -149,7 +150,11 @@ final class MacWindow: Window {
                 let onePixelOffset = macApp.appId == .zoom ? .zero : CGPoint(x: 1, y: 1)
                 p = nodeMonitor.visibleRect.bottomRightCorner - onePixelOffset
         }
-        setAxFrame(p, nil)
+        // Avoid duplicate AX writes if we're already parked at the same spot
+        if lastHiddenCornerTopLeft != p {
+            setAxFrame(p, nil)
+            lastHiddenCornerTopLeft = p
+        }
     }
 
     @MainActor
@@ -173,6 +178,7 @@ final class MacWindow: Window {
         }
 
         self.prevUnhiddenProportionalPositionInsideWorkspaceRect = nil
+        self.lastHiddenCornerTopLeft = nil
     }
 
     override var isHiddenInCorner: Bool {
