@@ -111,21 +111,29 @@ final class MacApp: AbstractApp {
     @MainActor func nativeFocus(_ windowId: UInt32) {
         if serverArgs.isReadOnly { return }
         MacApp.focusJob?.cancel()
-        // Performance optimization. If possible avoid doing AX requests
-        // (important for apps which are slow at responding even such basic AX requests. E.g. Godot)
-        // Beware of the macOS bug: https://github.com/nikitabobko/AeroSpace/issues/101
-        if (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
-            (lastNativeFocusedWindowId == windowId || windowsCount == 1)
-        {
-            nsApp.activate(options: .activateIgnoringOtherApps)
-        } else {
-            MacApp.focusJob = withWindowAsync(windowId) { [nsApp] window, job in
-                // Raise firstly to make sure that by the time we activate the app, the window would be already on top
-                window.set(Ax.isMainAttr, true)
-                AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-                nsApp.activate(options: .activateIgnoringOtherApps)
-            }
+
+        // Use SkyLight private APIs to focus the specific window
+        // This approach communicates directly with the WindowServer, avoiding race conditions
+        // that can occur with the AX-based approach when the same app has windows on different workspaces
+        // All operations run atomically in a single async job on the app's dedicated thread
+        MacApp.focusJob = withWindowAsync(windowId) { [pid] window, _ in
+            var psn = ProcessSerialNumber()
+            guard GetProcessForPID(pid, &psn) == noErr else { return }
+
+            // Tell WindowServer directly: "make THIS specific window frontmost"
+            // Unlike nsApp.activate(), this specifies exactly which window to focus
+            _SLPSSetFrontProcessWithOptions(&psn, windowId, SLPSMode.userGenerated.rawValue)
+
+            // Send synthetic events to make the window the key window (receives keyboard input)
+            // Uses two-phase approach (DOWN + UP) which simulates a complete click-to-focus cycle
+            makeKeyWindowTwoPhase(&psn, windowId)
+
+            // Raise the window to the front of the Z-order using AX API
+            // This notifies the app of the focus change and ensures proper window ordering
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
         }
+
+        lastNativeFocusedWindowId = windowId
     }
 
     func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {

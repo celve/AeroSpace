@@ -52,6 +52,14 @@ let package = Package(
             swiftSettings: [
                 .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
             ],
+            linkerSettings: [
+                // Link SkyLight private framework for window focus APIs
+                // (_SLPSSetFrontProcessWithOptions, SLPSPostEventRecordTo, etc.)
+                .unsafeFlags([
+                    "-F", "/System/Library/PrivateFrameworks",
+                    "-framework", "SkyLight",
+                ]),
+            ]
         ),
         .executableTarget(
             name: "AeroSpaceApp",
