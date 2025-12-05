@@ -117,6 +117,11 @@ open class TreeNode: Equatable, AeroAny {
         return iterator.next() ?? children.last
     }
 
+    /// Debug accessor for MRU children stack (most recent first)
+    var mruChildrenDebug: [TreeNode] {
+        Array(_mruChildren)
+    }
+
     @discardableResult
     func unbindFromParent() -> BindingData {
         unbindIfBound() ?? dieT("\(self) is already unbound. The stacktrace where it was unbound:\n\(unboundStacktrace ?? "nil")")
