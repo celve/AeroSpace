@@ -12,6 +12,8 @@ extension CmdArgs {
                 command = CloseAllWindowsButCurrentCommand(args: self as! CloseAllWindowsButCurrentCmdArgs)
             case .config:
                 command = ConfigCommand(args: self as! ConfigCmdArgs)
+            case .debugMru:
+                command = DebugMruCommand(args: self as! DebugMruCmdArgs)
             case .debugWindows:
                 command = DebugWindowsCommand(args: self as! DebugWindowsCmdArgs)
             case .enable:

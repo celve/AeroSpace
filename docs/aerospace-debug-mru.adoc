@@ -1,0 +1,34 @@
+= aerospace-debug-mru(1)
+include::util/man-attributes.adoc[]
+:manname: aerospace-debug-mru
+// tag::purpose[]
+:manpurpose: Print MRU (Most Recently Used) window debug information for each workspace
+// end::purpose[]
+
+// =========================================================== Synopsis
+== Synopsis
+[verse]
+// tag::synopsis[]
+aerospace debug-mru [-h|--help]
+
+// end::synopsis[]
+
+// =========================================================== Description
+== Description
+
+// tag::body[]
+{manpurpose}
+
+`debug-mru` command is *not stable API*.
+Please *don't rely on* the command existence and output format.
+The only intended use case is debugging MRU window tracking.
+
+// =========================================================== Options
+include::util/conditional-options-header.adoc[]
+
+-h, --help:: Print help
+
+// end::body[]
+
+// =========================================================== Footer
+include::util/man-footer.adoc[]
