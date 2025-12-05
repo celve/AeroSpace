@@ -175,20 +175,20 @@ final class MacApp: AbstractApp {
     }
 
     func isWindowHeuristic(_ windowId: UInt32, _ windowLevel: MacOsWindowLevel?) async throws -> Bool {
-        return try await withWindow(windowId) { [nsApp, axApp, appId] window, job in
-            window.isWindowHeuristic(axApp: axApp.threadGuarded, appId, nsApp.activationPolicy, windowLevel)
+        return try await withWindowCached(windowId) { [nsApp, axApp, appId] cachedWindow, job in
+            cachedWindow.isWindowHeuristic(axApp: axApp.threadGuarded, appId, nsApp.activationPolicy, windowLevel)
         } == true
     }
 
     func getAxUiElementWindowType(_ windowId: UInt32, _ windowLevel: MacOsWindowLevel?) async throws -> AxUiElementWindowType {
-        return try await withWindow(windowId) { [nsApp, axApp, appId] window, job in
-            window.getWindowType(axApp: axApp.threadGuarded, appId, nsApp.activationPolicy, windowLevel)
+        return try await withWindowCached(windowId) { [nsApp, axApp, appId] cachedWindow, job in
+            cachedWindow.getWindowType(axApp: axApp.threadGuarded, appId, nsApp.activationPolicy, windowLevel)
         } ?? .window
     }
 
     func isDialogHeuristic(_ windowId: UInt32, _ windowLevel: MacOsWindowLevel?) async throws -> Bool {
-        try await withWindow(windowId) { [appId] window, job in
-            window.isDialogHeuristic(appId, windowLevel)
+        try await withWindowCached(windowId) { [appId] cachedWindow, job in
+            cachedWindow.isDialogHeuristic(appId, windowLevel)
         } == true
     }
 
@@ -332,6 +332,15 @@ final class MacApp: AbstractApp {
         }
     }
 
+    /// Like `withWindow`, but provides a `CachedAxElement` for efficient repeated attribute reads.
+    /// Use this for heuristic checks that read many static/semi-static attributes.
+    private func withWindowCached<T>(_ windowId: UInt32, _ body: @Sendable @escaping (CachedAxElement, RunLoopJob) throws -> T?) async throws -> T? {
+        try await thread?.runInLoop { [windows] job in
+            guard let window = windows.threadGuarded[windowId] else { return nil }
+            return try body(window.cachedAx, job)
+        }
+    }
+
     private func withWindowAsync(_ windowId: UInt32, _ body: @Sendable @escaping (AXUIElement, RunLoopJob) throws -> ()) -> RunLoopJob {
         thread?.runInLoopAsync { [windows] job in
             guard let window = windows.threadGuarded[windowId] else { return }
@@ -343,11 +352,13 @@ final class MacApp: AbstractApp {
 private final class AxWindow {
     let windowId: UInt32
     let ax: AXUIElement
+    let cachedAx: CachedAxElement
     private let axSubscriptions: [AxSubscription] // keep subscriptions in memory
 
     private init(windowId: UInt32, _ ax: AXUIElement, _ axSubscriptions: [AxSubscription]) {
         self.windowId = windowId
         self.ax = ax
+        self.cachedAx = CachedAxElement(ax)
         assert(!axSubscriptions.isEmpty)
         self.axSubscriptions = axSubscriptions
     }
